@@ -511,7 +511,12 @@ class manager {
      * @param bool $skiprunning do not return tasks that are in the running state
      * @return array
      */
-    public static function get_adhoc_tasks(string $classname, bool $failedonly = false, bool $skiprunning = false): array {
+    public static function get_adhoc_tasks(
+        string $classname,
+        bool $failedonly = false,
+        bool $skiprunning = false,
+        bool $dueonly = false
+    ): array {
         global $DB;
 
         $conds[] = 'classname = ?';
@@ -519,6 +524,8 @@ class manager {
 
         if ($failedonly) {
             $conds[] = 'faildelay > 0';
+        } else if ($dueonly) {
+            $conds[] = 'faildelay = 0';
         }
         if ($skiprunning) {
             $conds[] = 'timestarted IS NULL';
@@ -948,6 +955,23 @@ class manager {
         }
 
         return null;
+    }
+
+    /**
+     * This function will delete an adhoc task by id. The task will be removed
+     * from the database.
+     *
+     * @param int $taskid
+     * @throws \moodle_exception
+     */
+    public static function delete_adhoc_task(int $taskid): void {
+        global $DB;
+
+        // Ensure the task exists.
+        $record = $DB->get_record('task_adhoc', ['id' => $taskid], '*', MUST_EXIST);
+
+        // Delete the task from the database.
+        $DB->delete_records('task_adhoc', ['id' => $taskid]);
     }
 
     /**
