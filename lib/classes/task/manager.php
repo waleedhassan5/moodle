@@ -507,8 +507,9 @@ class manager {
      * This function load the adhoc tasks for a given classname.
      *
      * @param string $classname
-     * @param bool $failedonly
-     * @param bool $skiprunning do not return tasks that are in the running state
+     * @param bool $failedonly Return only failed tasks
+     * @param bool $skiprunning Do not return tasks that are in the running state
+     * @param bool $dueonly Return only tasks that are due to run (nextruntime < now)
      * @return array
      */
     public static function get_adhoc_tasks(
@@ -962,15 +963,9 @@ class manager {
      * from the database.
      *
      * @param int $taskid
-     * @throws \moodle_exception
      */
     public static function delete_adhoc_task(int $taskid): void {
         global $DB;
-
-        // Ensure the task exists.
-        $record = $DB->get_record('task_adhoc', ['id' => $taskid], '*', MUST_EXIST);
-
-        // Delete the task from the database.
         $DB->delete_records('task_adhoc', ['id' => $taskid]);
     }
 

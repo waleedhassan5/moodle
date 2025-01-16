@@ -256,7 +256,7 @@ class tool_task_renderer extends plugin_renderer_base {
             get_string('payload', 'tool_task'),
             $failedstr,
             get_string('faildelay', 'tool_task'),
-            get_string('deletetask', 'tool_task'),
+            get_string('actions','tool_task'),
         ];
 
         $table->attributes['class'] = 'generaltable';
@@ -319,10 +319,12 @@ class tool_task_renderer extends plugin_renderer_base {
                 new moodle_url($adhocdeleteurl, ['taskid' => $taskid, 'sesskey' => sesskey()]),
                 get_string('delete'),
                 [
-                    'class' => 'btn btn-primary',
+                    'class' => 'btn btn-danger',
+                    'role' => 'button',
+                    'aria-label' => get_string('deleteadhoctask', 'tool_task', $taskid),
                     'data-confirmation' => 'modal',
                     'data-confirmation-type' => 'delete',
-                    'data-confirmation-title-str' => '["delete", "core"]',
+                    'data-confirmation-title-str' => '["deleteadhoctask", "tool_task",{"id":'.$taskid.'}]',
                     'data-confirmation-content-str' => '["confirmdeletetaskwithid", "tool_task", {"id":'.$taskid.'}]',
                     'data-confirmation-yes-button-str' => '["delete", "core"]',
                 ]

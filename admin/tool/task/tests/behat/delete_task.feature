@@ -4,10 +4,8 @@ Feature: Delete an adhoc task
   As an admin
   I need to be able to delete adhoc tasks
 
-  Background:
-    Given I log in as "admin"
-
   Scenario: Delete an existing adhoc task
+    Given I log in as "admin"
     And the following "tool_task > adhoc tasks" exist:
       | classname                            | seconds | hostname     | pid  |
       | \core\task\asynchronous_backup_task  | 7201    | c69335460f7f | 1915 |

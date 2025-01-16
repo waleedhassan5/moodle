@@ -44,12 +44,3 @@ $returnurl = new moodle_url('/admin/tool/task/adhoctasks.php',
 require_sesskey();
 \core\task\manager::delete_adhoc_task($taskid);
 redirect($returnurl);
-
-// Start output.
-$PAGE->set_url(new moodle_url('/admin/tool/task/delete_adhoctask.php', ['taskid' => $taskid]));
-$PAGE->set_context($context);
-$PAGE->navbar->add(get_string('adhoctasks', 'tool_task'), new moodle_url('/admin/tool/task/adhoctasks.php'));
-$PAGE->navbar->add(get_string('delete'));
-echo $OUTPUT->header();
-
-echo $OUTPUT->footer();

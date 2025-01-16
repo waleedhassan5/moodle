@@ -143,3 +143,5 @@ $string['taskschedulemonth_help'] = 'Month field for task schedule. The field us
 * <strong>1,5</strong> Every January and May';
 $string['privacy:metadata'] = 'The Scheduled task configuration plugin does not store any personal data.';
 $string['viewlogs'] = 'View logs for {$a}';
+$string['actions'] = 'Actions';
+$string['deleteadhoctask'] = 'Delete ad hoc task {$a->id}';
