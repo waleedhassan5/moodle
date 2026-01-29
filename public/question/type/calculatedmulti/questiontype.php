@@ -211,6 +211,7 @@ class qtype_calculatedmulti extends qtype_calculated {
         }
 
         $question->datasetloader = new qtype_calculated_dataset_loader($questiondata->id);
+        $this->require_datasets_ready_for_use($questiondata);
     }
 
     /**
