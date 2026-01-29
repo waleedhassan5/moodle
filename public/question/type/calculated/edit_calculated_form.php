@@ -51,6 +51,8 @@ class qtype_calculated_edit_form extends qtype_numerical_edit_form {
     public function __construct($submiturl, $question, $category, $contexts,
             $formeditable = true) {
         global $CFG, $DB;
+        $cache = \cache::make('qtype_calculated', 'editingrequest');
+        $cache->set('editing', true);
         $this->question = $question;
         $this->reload = optional_param('reload', false, PARAM_BOOL);
 
@@ -124,6 +126,8 @@ class qtype_calculated_edit_form extends qtype_numerical_edit_form {
      * @param MoodleQuickForm $mform the form being built.
      */
     protected function definition_inner($mform) {
+        $qtype = question_bank::get_qtype($this->question->qtype);
+        $qtype->restrict_status_if_setup_required($mform, $this->question);
         $this->qtypeobj = question_bank::get_qtype($this->qtype());
         $label = get_string('sharedwildcards', 'qtype_calculated');
         $mform->addElement('hidden', 'initialcategory', 1);
