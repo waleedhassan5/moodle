@@ -27,7 +27,6 @@ global $CFG;
 require_once($CFG->dirroot . '/question/type/calculated/questiontype.php');
 require_once($CFG->dirroot . '/question/type/calculated/tests/helper.php');
 
-
 /**
  * Unit tests for question/type/calculated/questiontype.php.
  *
@@ -50,6 +49,37 @@ final class question_type_test extends \advanced_testcase {
     protected function tearDown(): void {
         $this->qtype = null;
         parent::tearDown();
+    }
+    /**
+     * Creates one dataset definition, links it to the question, and inserts one dataset item.
+     *
+     * @param int $questionid The question to attach the dataset to.
+     */
+    private function add_one_dataset_item(int $questionid): void {
+        global $DB;
+
+        // Dataset definition.
+        $datasetdef = (object)[
+            'type' => 1,
+            'name' => 'a',
+            'category' => 0,
+            'options' => 'uniform:1.0:10.0:1',
+            'itemcount' => 1,
+        ];
+        $datasetdef->id = $DB->insert_record('question_dataset_definitions', $datasetdef);
+
+        // Link to question.
+        $DB->insert_record('question_datasets', (object)[
+            'question' => $questionid,
+            'datasetdefinition' => $datasetdef->id,
+        ]);
+
+        // One item.
+        $DB->insert_record('question_dataset_items', (object)[
+            'definition' => $datasetdef->id,
+            'itemnumber' => 1,
+            'value' => '3.14',
+        ]);
     }
 
     public function test_name(): void {
@@ -258,4 +288,205 @@ final class question_type_test extends \advanced_testcase {
         $this->assertIsObject($answer);
         $this->assertInfinite($answer->answer);
     }
+
+    /**
+     * When not editing, loading an incomplete calculated question throws a friendly exception.
+     */
+    public function test_missing_datasets_throws_friendly_exception_when_not_editing(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $syscontext = \context_system::instance();
+        /** @var \core_question_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category(['contextid' => $syscontext->id]);
+
+        $fromform = \test_question_maker::get_question_form_data('calculated');
+        $fromform->category = $category->id . ',' . $syscontext->id;
+
+        $question = (object)[
+            'category' => $category->id,
+            'qtype' => 'calculated',
+            'createdby' => 0,
+        ];
+        $this->qtype->save_question($question, $fromform);
+
+        $PAGE->set_pagetype('mod-quiz-startattempt');
+
+        try {
+            question_bank::load_question($question->id);
+            $this->fail('Expected moodle_exception was not thrown.');
+        } catch (\moodle_exception $e) {
+            $this->assertEquals('missingdatasetswithlink', $e->errorcode);
+            $this->assertEquals('qtype_calculated', $e->module);
+        }
+    }
+
+    /**
+     * When editing, loading an incomplete calculated question does not throw.
+     */
+    public function test_missing_datasets_does_not_throw_when_editing_request(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $syscontext = \context_system::instance();
+        /** @var \core_question_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category(['contextid' => $syscontext->id]);
+
+        $fromform = \test_question_maker::get_question_form_data('calculated');
+        $fromform->category = $category->id . ',' . $syscontext->id;
+
+        $question = (object)[
+            'category' => $category->id,
+            'qtype' => 'calculated',
+            'createdby' => 0,
+        ];
+        $this->qtype->save_question($question, $fromform);
+
+        $cache = \cache::make('qtype_calculated', 'editingrequest');
+        $cache->set('editing', true);
+
+        $qdef = question_bank::load_question($question->id);
+        $this->assertInstanceOf(\question_definition::class, $qdef);
+        $cache->delete('editing');
+    }
+
+    /**
+     * Saving the datasetitems step with status READY throws if setup is still incomplete.
+     */
+    public function test_save_question_datasetitems_ready_throws_when_setup_missing(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $syscontext = \context_system::instance();
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category(['contextid' => $syscontext->id]);
+
+        $fromform = \test_question_maker::get_question_form_data('calculated');
+        $fromform->category = $category->id . ',' . $syscontext->id;
+
+        $question = (object)[
+            'category' => $category->id,
+            'qtype' => 'calculated',
+            'createdby' => 0,
+        ];
+        $this->qtype->save_question($question, $fromform);
+
+        // Force wizardnow=datasetitems path (save_question reads it via optional_param).
+        $_POST['wizardnow'] = 'datasetitems';
+
+        $form = (object)[
+            'id' => $question->id,
+            'status' => \core_question\local\bank\question_version_status::QUESTION_STATUS_READY,
+            'definition' => [],
+            'number' => [],
+            'itemid' => [],
+            'tolerance' => [],
+            'tolerancetype' => [],
+            'correctanswerlength' => [],
+            'correctanswerformat' => [],
+        ];
+
+        $this->expectException(\moodle_exception::class);
+        $this->qtype->save_question($question, $form);
+    }
+
+    /**
+     * Saving the datasetitems step can set the status to READY once dataset items exist.
+     */
+    public function test_save_question_datasetitems_saves_ready_when_setup_complete(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $syscontext = \context_system::instance();
+        /** @var \core_question_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category(['contextid' => $syscontext->id]);
+
+        $fromform = \test_question_maker::get_question_form_data('calculated');
+        $fromform->category = $category->id . ',' . $syscontext->id;
+
+        $question = (object)[
+            'category' => $category->id,
+            'qtype' => 'calculated',
+            'createdby' => 0,
+        ];
+        $this->qtype->save_question($question, $fromform);
+
+        // Make the question "set up" by inserting one dataset item.
+        $this->add_one_dataset_item((int)$question->id);
+
+        // Force wizardnow=datasetitems path (save_question reads it via optional_param).
+        $_POST['wizardnow'] = 'datasetitems';
+
+        $form = (object)[
+            'id' => $question->id,
+            'status' => \core_question\local\bank\question_version_status::QUESTION_STATUS_READY,
+            'definition' => [],
+            'number' => [],
+            'itemid' => [],
+            'tolerance' => [],
+            'tolerancetype' => [],
+            'correctanswerlength' => [],
+            'correctanswerformat' => [],
+        ];
+
+        $this->qtype->save_question($question, $form);
+
+        $version = $DB->get_record('question_versions', ['questionid' => $question->id], 'status', MUST_EXIST);
+        $this->assertEquals(\core_question\local\bank\question_version_status::QUESTION_STATUS_READY, $version->status);
+    }
+
+    /**
+     * Saving the datasetitems step can keep the status as DRAFT even when dataset items exist.
+     */
+    public function test_save_question_datasetitems_saves_draft_when_selected(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $syscontext = \context_system::instance();
+        /** @var \core_question_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category(['contextid' => $syscontext->id]);
+
+        $fromform = \test_question_maker::get_question_form_data('calculated');
+        $fromform->category = $category->id . ',' . $syscontext->id;
+
+        $question = (object)[
+            'category' => $category->id,
+            'qtype' => 'calculated',
+            'createdby' => 0,
+        ];
+        $this->qtype->save_question($question, $fromform);
+
+        $this->add_one_dataset_item((int)$question->id);
+
+        // Force wizardnow=datasetitems path (save_question reads it via optional_param).
+        $_POST['wizardnow'] = 'datasetitems';
+
+        $form = (object)[
+            'id' => $question->id,
+            'status' => \core_question\local\bank\question_version_status::QUESTION_STATUS_DRAFT,
+            'definition' => [],
+            'number' => [],
+            'itemid' => [],
+            'tolerance' => [],
+            'tolerancetype' => [],
+            'correctanswerlength' => [],
+            'correctanswerformat' => [],
+        ];
+
+        $this->qtype->save_question($question, $form);
+
+        $version = $DB->get_record('question_versions', ['questionid' => $question->id], 'status', MUST_EXIST);
+        $this->assertEquals(\core_question\local\bank\question_version_status::QUESTION_STATUS_DRAFT, $version->status);
+    }
+
 }
