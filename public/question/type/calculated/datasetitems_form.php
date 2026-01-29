@@ -24,6 +24,9 @@
  */
 
 
+use core_question\local\bank\question_version_status;
+use qbank_editquestion\editquestion_helper;
+
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/question/type/edit_question_form.php');
@@ -76,7 +79,8 @@ class question_dataset_dependent_items_form extends question_wizard_form {
      */
     public function __construct($submiturl, $question, $regenerate) {
         global $SESSION;
-
+        $cache = \cache::make('qtype_calculated', 'editingrequest');
+        $cache->set('editing', true);
         // Validate the question category.
         if (!isset($question->categoryobject)) {
             throw new moodle_exception('categorydoesnotexist', 'question');
@@ -335,12 +339,26 @@ class question_dataset_dependent_items_form extends question_wizard_form {
 
         // Submit buttons.
         if ($this->noofitems > 0) {
+            // Status selector (Draft/Ready).
+            $statuslist = editquestion_helper::get_question_status_list();
+            $mform->addElement('select', 'status', get_string('status', 'qbank_editquestion'), $statuslist);
+            $mform->setType('status', PARAM_TEXT);
+
+            // Default to current status if known, else Draft.
+            $currentstatus = $this->question->status ?? question_version_status::QUESTION_STATUS_DRAFT;
+            $mform->setDefault('status', $currentstatus);
             $buttonarray = [];
             $buttonarray[] = $mform->createElement(
-                    'submit', 'savechanges', get_string('savechanges'));
+                'submit',
+                'savechanges',
+                get_string('savechanges')
+            );
+
             if (\core\plugininfo\qbank::is_plugin_enabled('qbank_previewquestion')) {
                 $previewlink = $PAGE->get_renderer('qbank_previewquestion')->question_preview_link($this->question->id,
-                        $this->categorycontext, true);
+                    $this->categorycontext,
+                    true
+                );
             }
             $buttonarray[] = $mform->createElement('static', 'previewlink', '', $previewlink);
 

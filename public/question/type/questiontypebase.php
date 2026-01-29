@@ -101,6 +101,18 @@ class question_type {
     }
 
     /**
+     * Check whether this question still requires additional setup before it can be set to READY.
+     *
+     * Question types that need multi-step setup (e.g. datasets) should override this.
+     *
+     * @param int $questionid The ID of the question being checked.
+     * @return bool True if setup is still required, false if it can be set to READY.
+     */
+    public function question_requires_setup(int $questionid): bool {
+        return false;
+    }
+
+    /**
      * @return bool true if this question type sometimes requires manual grading.
      */
     public function is_manual_graded() {
