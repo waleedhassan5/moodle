@@ -18,6 +18,7 @@ namespace qbank_editquestion;
 
 use core_question\local\bank\column_base;
 use core_question\local\bank\question_version_status;
+use question_bank;
 
 /**
  * A column to show the status of the question.
@@ -37,14 +38,31 @@ class question_status_column extends column_base {
         return get_string('questionstatus', 'qbank_editquestion');
     }
 
+    /**
+     * Get the help icon for this column.
+     *
+     * @return \help_icon|null
+     */
+    public function help_icon(): ?\help_icon {
+        return new \help_icon('questionstatus', 'qbank_editquestion');
+    }
+
     protected function display_content($question, $rowclasses): void {
         global $PAGE;
         if (question_has_capability_on($question, 'edit')
             && $question->status !== question_version_status::QUESTION_STATUS_HIDDEN) {
             $options = [];
             $options['questionid'] = $question->id;
+            $qtype = question_bank::get_qtype($question->qtype);
+            $setuprequired = method_exists($qtype, 'question_requires_setup')
+                && $qtype->question_requires_setup($question->id);
+
             $statuslist = editquestion_helper::get_question_status_list();
             foreach ($statuslist as $value => $displaystatus) {
+                // If setup is required, do not allow Ready.
+                if ($setuprequired && $value === question_version_status::QUESTION_STATUS_READY) {
+                    continue;
+                }
                 $options['options'][] = [
                     'name' => $displaystatus,
                     'value' => $value,
