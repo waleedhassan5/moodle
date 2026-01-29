@@ -46,6 +46,8 @@ class qtype_calculatedmulti_edit_form extends question_edit_form {
 
     public function __construct($submiturl, $question, $category,
             $contexts, $formeditable = true) {
+        $cache = \cache::make('qtype_calculated', 'editingrequest');
+        $cache->set('editing', true);
         $this->question = $question;
         $this->qtypeobj = question_bank::get_qtype('calculatedmulti');
         $this->reload = optional_param('reload', false, PARAM_BOOL);
@@ -106,7 +108,10 @@ class qtype_calculatedmulti_edit_form extends question_edit_form {
     }
 
     protected function definition_inner($mform) {
-
+        $qtype = question_bank::get_qtype($this->question->qtype);
+        if (method_exists($qtype, 'restrict_status_if_setup_required')) {
+            $qtype->restrict_status_if_setup_required($mform, $this->question);
+        }
         $label = get_string('sharedwildcards', 'qtype_calculated');
         $mform->addElement('hidden', 'initialcategory', 1);
         $mform->addElement('hidden', 'reload', 1);

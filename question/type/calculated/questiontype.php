@@ -29,6 +29,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/question/type/questiontypebase.php');
 require_once($CFG->dirroot . '/question/type/questionbase.php');
 require_once($CFG->dirroot . '/question/type/numerical/question.php');
+use core_question\local\bank\question_version_status;
 
 
 /**
@@ -276,6 +277,159 @@ class qtype_calculated extends question_type {
         return true;
     }
 
+    /**
+     * Build a URL to the question editing screen so missing datasets can be fixed.
+     *
+     * If available, the current cmid is preserved so the editor can return
+     * correctly to the quiz context.
+     *
+     * @param int $questionid The question ID to edit.
+     * @return \moodle_url URL to the question editing page.
+     * @throws \core\exception\moodle_exception
+     * @throws coding_exception
+     */
+    protected function get_fix_datasets_url(int $questionid): \moodle_url {
+        // In the quiz context, the question editing screen requires cmid.
+        $cmid = optional_param('cmid', 0, PARAM_INT);
+
+        $params = ['id' => $questionid];
+        if (!empty($cmid)) {
+            $params['cmid'] = $cmid;
+        }
+
+        return new \moodle_url('/question/bank/editquestion/question.php', $params);
+    }
+
+    /**
+     * Determine whether the current request is part of the question editing flow.
+     *
+     * Used to allow incomplete calculated questions to be opened for editing
+     * without throwing runtime exceptions.
+     *
+     * @return bool True if this is a question editing request.
+     */
+    protected function is_question_editing_request(): bool {
+        $cache = \cache::make('qtype_calculated', 'editingrequest');
+        return (bool) $cache->get('editing');
+    }
+
+    /**
+     * Check whether a calculated question still needs dataset items to be created.
+     *
+     * @param int $questionid The ID of the question to check.
+     * @return bool True if the question is missing dataset items, false otherwise.
+     * @throws \dml_exception
+     */
+    public function question_requires_setup(int $questionid): bool {
+        global $DB;
+
+        $sql = "SELECT 1
+                  FROM {question_datasets} qd
+                  JOIN {question_dataset_items} qdi ON qdi.definition = qd.datasetdefinition
+                 WHERE qd.question = ?";
+
+        return !$DB->record_exists_sql($sql, [$questionid]);
+    }
+
+    /**
+     * Update the status of the current question version if it differs from the given value.
+     *
+     * @param int $questionid The question ID whose version status should be updated.
+     * @param string $status The target status (e.g. QUESTION_STATUS_DRAFT or READY).
+     * @return void
+     * @throws dml_exception
+     */
+    protected function set_question_version_status(int $questionid, string $status): void {
+        global $DB;
+
+        $version = $DB->get_record(
+            'question_versions',
+            ['questionid' => $questionid],
+            'id,status',
+            IGNORE_MISSING
+        );
+
+        if (!$version || $version->status === $status) {
+            return;
+        }
+
+        $version->status = $status;
+        $DB->update_record('question_versions', $version);
+    }
+
+    /**
+     * Throw the appropriate exception if this question is missing dataset items.
+     *
+     * If the user can edit the question, throw the exception with a link to the edit page.
+     * Otherwise throw the no-link exception.
+     *
+     * @param stdClass $questiondata Question DB record/structure with at least ->id and ->contextid.
+     * @return void
+     * @throws moodle_exception
+     */
+    protected function require_datasets_ready_for_use(\stdClass $questiondata): void {
+        if ($this->is_question_editing_request() || !$this->question_requires_setup((int)$questiondata->id)) {
+            return;
+        }
+
+        $context = \context::instance_by_id($questiondata->contextid);
+
+        if (has_capability('moodle/question:editall', $context) || has_capability('moodle/question:editmine', $context)) {
+            $fixurl = $this->get_fix_datasets_url((int)$questiondata->id);
+            throw new \moodle_exception('missingdatasetswithlink', 'qtype_calculated', $fixurl->out(false));
+        }
+
+        throw new \moodle_exception('missingdatasets', 'qtype_calculated');
+    }
+
+    /**
+     * Save the question version status with validation.
+     *
+     * @param object $question
+     * @param object $form
+     */
+    protected function save_version_status($question, $form): void {
+        $chosenstatus = $form->status ?? question_version_status::QUESTION_STATUS_DRAFT;
+
+        if (
+            $chosenstatus === question_version_status::QUESTION_STATUS_READY
+            && $this->question_requires_setup($question->id)
+        ) {
+            throw new \moodle_exception('missingdatasetswithlink', 'qtype_calculated');
+        }
+
+        $this->set_question_version_status($question->id, $chosenstatus);
+    }
+    /**
+     * Adjust the status element if the question requires setup.
+     *
+     * @param MoodleQuickForm $mform
+     * @param stdClass $question
+     */
+    public function restrict_status_if_setup_required(\MoodleQuickForm $mform, \stdClass $question): void {
+        $qtype = question_bank::get_qtype($question->qtype);
+
+        $setuprequired = empty($question->id) ||
+            (method_exists($qtype, 'question_requires_setup') &&
+                $qtype->question_requires_setup((int) $question->id) !== null);
+
+        if (!$setuprequired) {
+            return;
+        }
+
+        $status = $mform->getElement('status');
+        if (!$status) {
+            return;
+        }
+
+        $status->removeOptions();
+        $status->addOption(
+            get_string('questionstatusdraft', 'qbank_editquestion'),
+            \core_question\local\bank\question_version_status::QUESTION_STATUS_DRAFT
+        );
+
+        $mform->addHelpButton('status', 'statusrequiresdatasetsetup', 'qtype_calculated');
+    }
     public function import_datasets($question) {
         global $DB;
         $n = count($question->dataset);
@@ -369,6 +523,7 @@ class qtype_calculated extends question_type {
                 $questiondata->options->units, $questiondata->options->unitsleft);
 
         $question->datasetloader = new qtype_calculated_dataset_loader($questiondata->id);
+        $this->require_datasets_ready_for_use($questiondata);
     }
 
     public function finished_edit_wizard($form) {
@@ -624,6 +779,7 @@ class qtype_calculated extends question_type {
      * @param object $form
      * @param int $course
      * @param PARAM_ALPHA $wizardnow should be added as we are coming from question2.php
+     * @throws dml_exception
      */
     public function save_question($question, $form) {
         global $DB;
@@ -689,6 +845,14 @@ class qtype_calculated extends question_type {
             case 'datasetitems':
                 $this->save_dataset_items($question, $form);
                 $this->save_question_calculated($question, $form);
+                $chosenstatus = $form->status ?? question_version_status::QUESTION_STATUS_DRAFT;
+                if (
+                    $chosenstatus === question_version_status::QUESTION_STATUS_READY
+                    && $this->question_requires_setup($question->id)
+                ) {
+                    throw new \moodle_exception('missingdatasetswithlink', 'qtype_calculated');
+                }
+                $this->set_question_version_status($question->id, $chosenstatus);
                 break;
             default:
                 throw new \moodle_exception('invalidwizardpage', 'question');

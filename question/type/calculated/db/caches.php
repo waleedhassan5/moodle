@@ -1,5 +1,5 @@
 <?php
-// This file is part of Moodle - http://moodle.org/
+// This file is part of Moodle - https://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,25 +12,25 @@
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Version information for the calculated question type.
+ * Cache definitions for the calculated question type.
  *
- * @package    qtype
- * @subpackage calculated
- * @copyright  1999 onwards Martin Dougiamas {@link http://moodle.com}
+ * Used to store request-scoped flags related to calculated question
+ * editing flow (for example, detecting when a question is being edited).
+ *
+ * @package    qtype_calculated
+ * @copyright  2026 Waleed Hassan <waleed.hassan@catalyst-eu.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'qtype_calculated';
-$plugin->version   = 2025041401;
-
-$plugin->requires  = 2025040800;
-$plugin->dependencies = [
-    'qtype_numerical' => 2025040800,
+$definitions = [
+    'editingrequest' => [
+        'mode' => cache_store::MODE_REQUEST,
+        'simplekeys' => true,
+        'simpledata' => true,
+    ],
 ];
-
-$plugin->maturity  = MATURITY_STABLE;
