@@ -31,6 +31,7 @@ $string['privacy:metadata'] = 'The Edit questions question bank plugin does not 
 
 // Question status.
 $string['questionstatus'] = 'Status';
+$string['questionstatus_help'] = 'Some question types may prevent setting a question to Ready until it has been fully set up (for example, until required datasets are defined).';
 $string['questionstatusready'] = 'Ready';
 $string['questionstatushidden'] = 'Hidden';
 $string['questionstatusdraft'] = 'Draft';
