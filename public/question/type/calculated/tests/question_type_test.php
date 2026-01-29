@@ -16,6 +16,7 @@
 
 namespace qtype_calculated;
 
+use core\exception\moodle_exception;
 use qtype_calculated;
 use qtype_numerical;
 use question_bank;
@@ -101,7 +102,7 @@ final class question_type_test extends \advanced_testcase {
         $this->assertEquals(0, $questiondata->penalty);
         $this->assertEquals('calculated', $questiondata->qtype);
         $this->assertEquals(1, $questiondata->length);
-        $this->assertEquals(\core_question\local\bank\question_version_status::QUESTION_STATUS_READY, $questiondata->status);
+        $this->assertEquals(\core_question\local\bank\question_version_status::QUESTION_STATUS_DRAFT, $questiondata->status);
         $this->assertEquals($question->createdby, $questiondata->createdby);
         $this->assertEquals($question->createdby, $questiondata->modifiedby);
         $this->assertEquals('', $questiondata->idnumber);
@@ -258,4 +259,80 @@ final class question_type_test extends \advanced_testcase {
         $this->assertIsObject($answer);
         $this->assertInfinite($answer->answer);
     }
+
+    public function test_missing_datasets_throws_friendly_exception_when_not_editing(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $syscontext = \context_system::instance();
+        /** @var \core_question_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category(['contextid' => $syscontext->id]);
+
+        // Create a calculated question but do NOT complete datasets/items step.
+        $fromform = \test_question_maker::get_question_form_data('calculated');
+        $fromform->category = $category->id . ',' . $syscontext->id;
+
+        $question = (object)[
+            'category' => $category->id,
+            'qtype' => 'calculated',
+            'createdby' => 0,
+        ];
+        $this->qtype->save_question($question, $fromform);
+
+        // Simulate a non-editing page (e.g. quiz attempt start).
+        $PAGE->set_pagetype('mod-quiz-startattempt');
+
+        try {
+            // This should trigger initialise_question_instance() and throw your exception.
+            question_bank::load_question($question->id);
+            $this->fail('Expected moodle_exception was not thrown.');
+        } catch (\moodle_exception $e) {
+            $this->assertEquals('missingdatasetswithlink', $e->errorcode);
+            $this->assertEquals('qtype_calculated', $e->module);
+        }
+    }
+
+    /**
+     * tests the exception for already bad data without datasets
+     * @throws moodle_exception
+     * @throws \dml_exception
+     * @throws \moodle_exception
+     * @throws \Exception
+     */
+    public function test_missing_datasets_throws_friendly_exception_when_starting_attempt(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $syscontext = \context_system::instance();
+        /** @var \core_question_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category(['contextid' => $syscontext->id]);
+
+        // Create a calculated question but do NOT complete the dataset/items step.
+        $fromform = \test_question_maker::get_question_form_data('calculated');
+        $fromform->category = $category->id . ',' . $syscontext->id;
+
+        $question = (object)[
+            'category' => $category->id,
+            'qtype' => 'calculated',
+            'createdby' => 0,
+        ];
+        $this->qtype->save_question($question, $fromform);
+
+        // Simulate a non-editing request (e.g. quiz attempt start).
+        $_SERVER['SCRIPT_NAME'] = '/mod/quiz/startattempt.php';
+        $PAGE->set_pagetype('mod-quiz-startattempt');
+
+        $this->expectException(\moodle_exception::class);
+        $this->expectExceptionMessageMatches('/datasets have not been defined yet/i');
+
+        // This triggers qtype_calculated::initialise_question_instance() via question_bank::make_question().
+        question_bank::load_question($question->id);
+    }
+
 }

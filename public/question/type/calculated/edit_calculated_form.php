@@ -51,6 +51,8 @@ class qtype_calculated_edit_form extends qtype_numerical_edit_form {
     public function __construct($submiturl, $question, $category, $contexts,
             $formeditable = true) {
         global $CFG, $DB;
+        $cache = \cache::make('qtype_calculated', 'editingcontext');
+        $cache->set('editing', true);
         $this->question = $question;
         $this->reload = optional_param('reload', false, PARAM_BOOL);
 

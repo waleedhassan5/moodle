@@ -76,7 +76,8 @@ class question_dataset_dependent_items_form extends question_wizard_form {
      */
     public function __construct($submiturl, $question, $regenerate) {
         global $SESSION;
-
+        $cache = \cache::make('qtype_calculated', 'editingcontext');
+        $cache->set('editing', true);
         // Validate the question category.
         if (!isset($question->categoryobject)) {
             throw new moodle_exception('categorydoesnotexist', 'question');

@@ -56,6 +56,8 @@ class question_dataset_dependent_definitions_form extends question_wizard_form {
      * @param MoodleQuickForm $mform the form being built.
      */
     public function __construct($submiturl, $question) {
+        $cache = \cache::make('qtype_calculated', 'editingcontext');
+        $cache->set('editing', true);
         // Validate the question category.
         if (!isset($question->categoryobject)) {
             throw new moodle_exception('categorydoesnotexist', 'question');
