@@ -362,7 +362,6 @@ final class question_type_test extends \advanced_testcase {
         $this->setAdminUser();
 
         $syscontext = \context_system::instance();
-        /** @var \core_question_generator $generator */
         $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
         $category = $generator->create_question_category(['contextid' => $syscontext->id]);
 
@@ -382,10 +381,13 @@ final class question_type_test extends \advanced_testcase {
         $form = (object)[
             'id' => $question->id,
             'status' => \core_question\local\bank\question_version_status::QUESTION_STATUS_READY,
-            // Minimal payload for datasetitems step; should not create dataset items.
             'definition' => [],
             'number' => [],
             'itemid' => [],
+            'tolerance' => [],
+            'tolerancetype' => [],
+            'correctanswerlength' => [],
+            'correctanswerformat' => [],
         ];
 
         $this->expectException(\moodle_exception::class);
@@ -419,15 +421,19 @@ final class question_type_test extends \advanced_testcase {
         // Make the question "set up" by inserting one dataset item.
         $this->add_one_dataset_item((int)$question->id);
 
+        // Force wizardnow=datasetitems path (save_question reads it via optional_param).
         $_POST['wizardnow'] = 'datasetitems';
 
         $form = (object)[
             'id' => $question->id,
             'status' => \core_question\local\bank\question_version_status::QUESTION_STATUS_READY,
-            // Minimal payload; dataset items already exist so setup is complete.
             'definition' => [],
             'number' => [],
             'itemid' => [],
+            'tolerance' => [],
+            'tolerancetype' => [],
+            'correctanswerlength' => [],
+            'correctanswerformat' => [],
         ];
 
         $this->qtype->save_question($question, $form);
@@ -462,6 +468,7 @@ final class question_type_test extends \advanced_testcase {
 
         $this->add_one_dataset_item((int)$question->id);
 
+        // Force wizardnow=datasetitems path (save_question reads it via optional_param).
         $_POST['wizardnow'] = 'datasetitems';
 
         $form = (object)[
@@ -470,6 +477,10 @@ final class question_type_test extends \advanced_testcase {
             'definition' => [],
             'number' => [],
             'itemid' => [],
+            'tolerance' => [],
+            'tolerancetype' => [],
+            'correctanswerlength' => [],
+            'correctanswerformat' => [],
         ];
 
         $this->qtype->save_question($question, $form);

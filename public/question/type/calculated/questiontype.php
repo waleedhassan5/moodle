@@ -314,24 +314,6 @@ class qtype_calculated extends question_type {
     }
 
     /**
-     * Check whether a calculated question has at least one dataset item defined.
-     *
-     * @param int $questionid The question ID to check.
-     * @return bool True if dataset items exist, false otherwise.
-     * @throws dml_exception
-     */
-    protected function has_dataset_items(int $questionid): bool {
-        global $DB;
-
-        $sql = "SELECT 1
-                  FROM {question_datasets} qd
-                  JOIN {question_dataset_items} qdi ON qdi.definition = qd.datasetdefinition
-                 WHERE qd.question = ?";
-
-        return $DB->record_exists_sql($sql, [$questionid]);
-    }
-
-    /**
      * Check whether a calculated question still needs dataset items to be created.
      *
      * @param int $questionid The ID of the question to check.
@@ -339,7 +321,14 @@ class qtype_calculated extends question_type {
      * @throws \dml_exception
      */
     public function question_requires_setup(int $questionid): bool {
-        return !$this->has_dataset_items($questionid);
+        global $DB;
+
+        $sql = "SELECT 1
+                  FROM {question_datasets} qd
+                  JOIN {question_dataset_items} qdi ON qdi.definition = qd.datasetdefinition
+                 WHERE qd.question = ?";
+
+        return !$DB->record_exists_sql($sql, [$questionid]);
     }
 
     /**
@@ -379,7 +368,7 @@ class qtype_calculated extends question_type {
      * @throws moodle_exception
      */
     protected function require_datasets_ready_for_use(\stdClass $questiondata): void {
-        if ($this->is_question_editing_request() || $this->has_dataset_items((int)$questiondata->id)) {
+        if ($this->is_question_editing_request() || !$this->question_requires_setup((int)$questiondata->id)) {
             return;
         }
 
@@ -856,12 +845,14 @@ class qtype_calculated extends question_type {
             case 'datasetitems':
                 $this->save_dataset_items($question, $form);
                 $this->save_question_calculated($question, $form);
-                if ($this->has_dataset_items($question->id)) {
-                    $chosenstatus = $form->status ?? question_version_status::QUESTION_STATUS_DRAFT;
-                    $this->set_question_version_status($question->id, $chosenstatus);
-                } else {
-                    $this->set_question_version_status($question->id, question_version_status::QUESTION_STATUS_DRAFT);
+                $chosenstatus = $form->status ?? question_version_status::QUESTION_STATUS_DRAFT;
+                if (
+                    $chosenstatus === question_version_status::QUESTION_STATUS_READY
+                    && $this->question_requires_setup($question->id)
+                ) {
+                    throw new \moodle_exception('missingdatasetswithlink', 'qtype_calculated');
                 }
+                $this->set_question_version_status($question->id, $chosenstatus);
                 break;
             default:
                 throw new \moodle_exception('invalidwizardpage', 'question');
