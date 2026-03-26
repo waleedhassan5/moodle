@@ -1,0 +1,52 @@
+{{!
+    @template report_progress/user_search
+
+    User search form for the activity completion report.
+
+    Example context (json):
+    {
+        "action": "https://example.com/report/progress/index.php?course=2",
+        "search": "user@example.com",
+        "hiddenfields": [
+            {
+                "name": "course",
+                "value": "2"
+            },
+            {
+                "name": "activityinclude",
+                "value": "all"
+            }
+        ],
+        "hassearch": true,
+        "clearurl": "https://example.com/report/progress/index.php?course=2",
+        "searchlabel": "Search by email",
+        "searchbuttonlabel": "Search",
+        "clearlabel": "Clear",
+        "fieldid": "report-progress-search"
+    }
+}}
+<div class="user-search-selector d-inline-block me-3 mt-2">
+    <form method="get" action="{{action}}" class="d-flex align-items-center mb-3" id="{{fieldid}}-form">
+        {{#hiddenfields}}
+            <input type="hidden" name="{{name}}" value="{{value}}">
+        {{/hiddenfields}}
+        <label for="{{fieldid}}" class="me-2 mb-0">
+            {{searchlabel}}
+        </label>
+        <input
+            type="text"
+            id="{{fieldid}}"
+            name="search"
+            value="{{search}}"
+            class="form-control me-2"
+            placeholder="{{searchlabel}}">
+
+        <button type="submit" class="btn btn-primary me-2">
+            {{searchbuttonlabel}}
+        </button>
+
+        {{#hassearch}}
+            <a href="{{clearurl}}" class="btn btn-secondary">{{clearlabel}}</a>
+        {{/hassearch}}
+    </form>
+</div>
