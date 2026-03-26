@@ -25,6 +25,7 @@
 
 use core\report_helper;
 use \report_progress\local\helper;
+use report_progress\output\user_search;
 
 require('../../config.php');
 require_once($CFG->libdir . '/completionlib.php');
@@ -52,6 +53,7 @@ $groupid = optional_param('group', 0, PARAM_INT);
 $activityinclude = optional_param('activityinclude', 'all', PARAM_TEXT);
 $activityorder = optional_param('activityorder', 'orderincourse', PARAM_TEXT);
 $activitysection = optional_param('activitysection', -1, PARAM_INT);
+$search = trim(optional_param('search', '', PARAM_TEXT));
 
 // Whether to show extra user identity information
 $userfields = \core_user\fields::for_identity($context);
@@ -85,6 +87,9 @@ if ($activityorder !== '') {
 }
 if ($activitysection !== '') {
     $url->param('activitysection', $activitysection);
+}
+if ($search !== '') {
+    $url->param('search', $search);
 }
 
 $PAGE->set_url($url);
@@ -147,6 +152,19 @@ if ($sifirst !== 'all') {
 if ($silast !== 'all') {
     $where[] = $DB->sql_like('u.lastname', ':silast', false, false);
     $where_params['silast'] = $silast.'%';
+}
+if ($search !== '') {
+    $searchlike = '%' . $search . '%';
+
+    $searchconditions = [];
+    $searchconditions[] = $DB->sql_like('u.firstname', ':searchfirstname', false, false);
+    $searchconditions[] = $DB->sql_like('u.lastname', ':searchlastname', false, false);
+    $searchconditions[] = $DB->sql_like('u.email', ':searchemail', false, false);
+
+    $where[] = '(' . implode(' OR ', $searchconditions) . ')';
+    $where_params['searchfirstname'] = $searchlike;
+    $where_params['searchlastname'] = $searchlike;
+    $where_params['searchemail'] = $searchlike;
 }
 
 // Get user match count
@@ -356,7 +374,7 @@ $pagingbar .= $OUTPUT->paging_bar($total, $page, helper::COMPLETION_REPORT_PAGE,
 
 // Start of table.
 print '<br class="clearer"/>'; // Ugh.
-
+echo $output->render(new user_search($url, $search));
 print $pagingbar;
 
 if (!$total) {

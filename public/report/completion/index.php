@@ -25,6 +25,7 @@
  */
 
 use core\report_helper;
+use report_progress\output\user_search;
 
 require_once(__DIR__.'/../../config.php');
 require_once("{$CFG->libdir}/completionlib.php");
@@ -71,7 +72,24 @@ if ($csv) {
 $start   = optional_param('start', 0, PARAM_INT);
 $sifirst = optional_param('sifirst', 'all', PARAM_NOTAGS);
 $silast  = optional_param('silast', 'all', PARAM_NOTAGS);
+$search  = trim(optional_param('search', '', PARAM_TEXT));
 
+$url = new moodle_url('/report/completion/index.php', ['course' => $course->id]);
+if ($sort !== '') {
+    $url->param('sort', $sort);
+}
+if ($sifirst !== 'all') {
+    $url->param('sifirst', $sifirst);
+}
+if ($silast !== 'all') {
+    $url->param('silast', $silast);
+}
+if ($search !== '') {
+    $url->param('search', $search);
+}
+
+$PAGE->set_url($url);
+$PAGE->set_pagelayout('report');
 // Whether to show extra user identity information.
 $extrafields = \core_user\fields::get_identity_fields($context, true);
 $leftcols = 1 + count($extrafields);
@@ -168,6 +186,10 @@ if ($csv) {
 
     // Handle groups (if enabled)
     groups_print_course_menu($course, $CFG->wwwroot.'/report/completion/index.php?course='.$course->id);
+    echo $OUTPUT->render_from_template(
+        'report_progress/user_search',
+        (new user_search($url, $search))->export_for_template($OUTPUT)
+    );
 }
 
 if ($sifirst !== 'all') {
@@ -202,7 +224,10 @@ if ($silast !== 'all') {
     $where[] = $DB->sql_like('u.lastname', ':silast', false, false);
     $where_params['silast'] = $silast.'%';
 }
-
+if ($search !== '') {
+    $where[] = $DB->sql_like('u.email', ':searchemail', false, false);
+    $where_params['searchemail'] = '%' . $search . '%';
+}
 // Get user match count
 $total = $completion->get_num_tracked_users(implode(' AND ', $where), $where_params, $group);
 
@@ -255,10 +280,13 @@ if ($total > COMPLETION_REPORT_PAGE) {
 
     $sistrings = array();
     if ($sifirst != 'all') {
-        $sistrings[] =  "sifirst={$sifirst}";
+        $sistrings[] = "sifirst=" . urlencode($sifirst);
     }
     if ($silast != 'all') {
-        $sistrings[] =  "silast={$silast}";
+        $sistrings[] = "silast=" . urlencode($silast);
+    }
+    if ($search !== '') {
+        $sistrings[] = "search=" . urlencode($search);
     }
     $sistring = !empty($sistrings) ? '&amp;'.implode('&amp;', $sistrings) : '';
 
@@ -433,17 +461,26 @@ if (!$csv) {
 
     // User heading / sort option
     print '<th scope="col" class="completion-sortchoice" style="clear: both;">';
+    $sortparams = ['course' => $course->id];
+    if ($silast !== 'all') {
+        $sortparams['silast'] = $silast;
+    }
+    if ($sifirst !== 'all') {
+        $sortparams['sifirst'] = $sifirst;
+    }
+    if ($search !== '') {
+        $sortparams['search'] = $search;
+    }
 
-    $sistring = "&amp;silast={$silast}&amp;sifirst={$sifirst}";
-
+    $sorturl = new moodle_url('/report/completion/index.php', $sortparams);
     if ($firstnamesort) {
-        print
-            get_string('firstname')." / <a href=\"./index.php?course={$course->id}{$sistring}\">".
-            get_string('lastname').'</a>';
+        $sorturl->param('sort', 'lastname');
+        $sortlink = html_writer::link($sorturl, get_string('lastname'));
+        print get_string('firstname') . " / $sortlink";
     } else {
-        print "<a href=\"./index.php?course={$course->id}&amp;sort=firstname{$sistring}\">".
-            get_string('firstname').'</a> / '.
-            get_string('lastname');
+        $sorturl->param('sort', 'firstname');
+        $sortlink = html_writer::link($sorturl, get_string('firstname'));
+        print "$sortlink / " . get_string('lastname');
     }
     print '</th>';
 
@@ -735,10 +772,27 @@ if ($csv) {
 }
 
 print '</table>';
+$exportparams = ['course' => $course->id];
+if ($sort !== '') {
+    $exportparams['sort'] = $sort;
+}
+if ($sifirst !== 'all') {
+    $exportparams['sifirst'] = $sifirst;
+}
+if ($silast !== 'all') {
+    $exportparams['silast'] = $silast;
+}
+if ($search !== '') {
+    $exportparams['search'] = $search;
+}
 
-$csvurl = new moodle_url('/report/completion/index.php', array('course' => $course->id, 'format' => 'csv'));
-$excelurl = new moodle_url('/report/completion/index.php', array('course' => $course->id, 'format' => 'excelcsv'));
+$csvparams = $exportparams;
+$csvparams['format'] = 'csv';
+$csvurl = new moodle_url('/report/completion/index.php', $csvparams);
 
+$excelparams = $exportparams;
+$excelparams['format'] = 'excelcsv';
+$excelurl = new moodle_url('/report/completion/index.php', $excelparams);
 print '<ul class="export-actions">';
 print '<li><a href="'.$csvurl->out().'">'.get_string('csvdownload','completion').'</a></li>';
 print '<li><a href="'.$excelurl->out().'">'.get_string('excelcsvdownload','completion').'</a></li>';
