@@ -155,4 +155,13 @@ class renderer extends plugin_renderer_base {
 
         return $downloadhtml;
     }
+    /**
+     * Render user search.
+     *
+     * @param \report_progress\output\user_search $search
+     * @return string
+     */
+    public function render_user_search(\report_progress\output\user_search $search): string {
+        return $this->render_from_template('report_progress/user_search', $search->export_for_template($this));
+    }
 }

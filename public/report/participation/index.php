@@ -24,6 +24,7 @@
  */
 
 use core\report_helper;
+use report_progress\output\user_search;
 
 require('../../config.php');
 require_once($CFG->dirroot.'/lib/tablelib.php');
@@ -42,14 +43,33 @@ $action     = optional_param('action', '', PARAM_ALPHA);
 $page       = optional_param('page', 0, PARAM_INT);                     // which page to show
 $perpage    = optional_param('perpage', DEFAULT_PAGE_SIZE, PARAM_INT);  // how many per page
 $currentgroup = optional_param('group', null, PARAM_INT); // Get the active group.
+$search = trim(optional_param('search', '', PARAM_TEXT));
 
-$url = new moodle_url('/report/participation/index.php', array('id'=>$id));
-if ($roleid !== 0) $url->param('roleid');
-if ($instanceid !== 0) $url->param('instanceid');
-if ($timefrom !== 0) $url->param('timefrom');
-if ($action !== '') $url->param('action');
-if ($page !== 0) $url->param('page');
-if ($perpage !== DEFAULT_PAGE_SIZE) $url->param('perpage');
+$url = new moodle_url('/report/participation/index.php', ['id' => $id]);
+if ($roleid !== 0) {
+    $url->param('roleid', $roleid);
+}
+if ($instanceid !== 0) {
+    $url->param('instanceid', $instanceid);
+}
+if ($timefrom !== 0) {
+    $url->param('timefrom', $timefrom);
+}
+if ($action !== '') {
+    $url->param('action', $action);
+}
+if ($page !== 0) {
+    $url->param('page', $page);
+}
+if ($perpage !== DEFAULT_PAGE_SIZE) {
+    $url->param('perpage', $perpage);
+}
+if ($currentgroup !== null) {
+    $url->param('group', $currentgroup);
+}
+if ($search !== '') {
+    $url->param('search', $search);
+}
 $PAGE->set_url($url);
 $PAGE->set_pagelayout('admin');
 
@@ -102,6 +122,7 @@ $modinfo = get_fast_modinfo($course);
 
 // Print first controls.
 report_participation_print_filter_form($course, $timefrom, $minlog, $action, $roleid, $instanceid);
+echo $OUTPUT->render_from_template('report_progress/user_search', (new user_search($url, $search))->export_for_template($OUTPUT));
 
 $baseurl = new moodle_url('/report/participation/index.php', array(
     'id' => $course->id,
@@ -110,7 +131,8 @@ $baseurl = new moodle_url('/report/participation/index.php', array(
     'timefrom' => $timefrom,
     'action' => $action,
     'perpage' => $perpage,
-    'group' => $currentgroup
+    'group' => $currentgroup,
+    'search' => $search,
 ));
 $select = groups_allgroups_course_menu($course, $baseurl, true, $currentgroup);
 
@@ -206,9 +228,21 @@ if (!empty($instanceid) && !empty($roleid)) {
     $totalcount = $DB->count_records_sql($countsql, $params);
 
     list($twhere, $tparams) = $table->get_sql_where();
+    $allwhere = [];
+    $allparams = $params;
+
     if ($twhere) {
-        $params = array_merge($params, $tparams);
-        $matchcount = $DB->count_records_sql($countsql.' AND '.$twhere, $params);
+        $allwhere[] = $twhere;
+        $allparams = array_merge($allparams, $tparams);
+    }
+
+    if ($search !== '') {
+        $allwhere[] = $DB->sql_like('u.email', ':searchemail', false, false);
+        $allparams['searchemail'] = '%' . $search . '%';
+    }
+
+    if ($allwhere) {
+        $matchcount = $DB->count_records_sql($countsql . ' AND ' . implode(' AND ', $allwhere), $allparams);
     } else {
         $matchcount = $totalcount;
     }
@@ -224,11 +258,13 @@ if (!empty($instanceid) && !empty($roleid)) {
     if ($uselegacyreader || $onlyuselegacyreader) {
         list($actionsql, $actionparams) = report_participation_get_action_sql($action, $cm->modname);
         $params = array_merge($params, $actionparams);
+        $allparams = array_merge($allparams, $actionparams);
     }
 
     if (!$onlyuselegacyreader) {
         list($crudsql, $crudparams) = report_participation_get_crud_sql($action);
         $params = array_merge($params, $crudparams);
+        $allparams = array_merge($allparams, $crudparams);
     }
 
     $userfieldsapi = \core_user\fields::for_name();
@@ -245,15 +281,15 @@ if (!empty($instanceid) && !empty($roleid)) {
                       FROM {log}
                      WHERE cmid = :instanceid
                            AND time > :timefrom " . $actionsql .
-                " GROUP BY userid) l ON (l.userid = ra.userid)";
-        if ($twhere) {
-            $sql .= ' WHERE '.$twhere; // Initial bar.
+            " GROUP BY userid) l ON (l.userid = ra.userid)";
+        if ($allwhere) {
+            $sql .= ' WHERE ' . implode(' AND ', $allwhere);
         }
 
         if ($table->get_sql_sort()) {
             $sql .= ' ORDER BY '.$table->get_sql_sort();
         }
-        if (!$users = $DB->get_records_sql($sql, $params, $table->get_page_start(), $table->get_page_size())) {
+        if (!$users = $DB->get_records_sql($sql, $allparams, $table->get_page_start(), $table->get_page_size())) {
             $users = array(); // Tablelib will handle saying 'Nothing to display' for us.
         }
     }
@@ -277,17 +313,17 @@ if (!empty($instanceid) && !empty($roleid)) {
         // We add this after the WHERE statement that may come below.
         $groupbysql = " GROUP BY ra.userid, $usernamefields, u.idnumber";
 
-        $params['edulevel'] = core\event\base::LEVEL_PARTICIPATING;
-        $params['contextlevel'] = CONTEXT_MODULE;
+        $allparams['edulevel'] = core\event\base::LEVEL_PARTICIPATING;
+        $allparams['contextlevel'] = CONTEXT_MODULE;
 
-        if ($twhere) {
-            $sql .= ' WHERE '.$twhere; // Initial bar.
+        if ($allwhere) {
+            $sql .= ' WHERE ' . implode(' AND ', $allwhere);
         }
         $sql .= $groupbysql;
         if ($table->get_sql_sort()) {
             $sql .= ' ORDER BY '.$table->get_sql_sort();
         }
-        if ($u = $DB->get_records_sql($sql, $params, $table->get_page_start(), $table->get_page_size())) {
+        if ($u = $DB->get_records_sql($sql, $allparams, $table->get_page_start(), $table->get_page_size())) {
             if (empty($users)) {
                 $users = $u;
             } else {
