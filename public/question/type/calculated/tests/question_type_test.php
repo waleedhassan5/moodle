@@ -407,9 +407,10 @@ final class question_type_test extends \advanced_testcase {
             'itemid' => [],
         ];
         $questiondata = question_bank::load_question_data($question->id);
+        $this->qtype->get_question_options($questiondata);
         $this->populate_required_datasetitems_form_fields($questiondata, $form);
         $this->expectException(\moodle_exception::class);
-        $this->qtype->save_question($question, $form);
+        $this->qtype->save_question($questiondata, $form);
     }
 
     /**
@@ -450,8 +451,10 @@ final class question_type_test extends \advanced_testcase {
             'itemid' => [],
         ];
         $questiondata = question_bank::load_question_data($question->id);
+        $this->qtype->get_question_options($questiondata); // Important: loads ->options->answers reliably.
         $this->populate_required_datasetitems_form_fields($questiondata, $form);
-        $this->qtype->save_question($question, $form);
+
+        $this->qtype->save_question($questiondata, $form); // IMPORTANT: pass the same object
 
         $version = $DB->get_record('question_versions', ['questionid' => $question->id], 'status', MUST_EXIST);
         $this->assertEquals(\core_question\local\bank\question_version_status::QUESTION_STATUS_READY, $version->status);
@@ -494,8 +497,10 @@ final class question_type_test extends \advanced_testcase {
             'itemid' => [],
         ];
         $questiondata = question_bank::load_question_data($question->id);
+        $this->qtype->get_question_options($questiondata);
         $this->populate_required_datasetitems_form_fields($questiondata, $form);
-        $this->qtype->save_question($question, $form);
+
+        $this->qtype->save_question($questiondata, $form);
 
         $version = $DB->get_record('question_versions', ['questionid' => $question->id], 'status', MUST_EXIST);
         $this->assertEquals(\core_question\local\bank\question_version_status::QUESTION_STATUS_DRAFT, $version->status);
