@@ -82,6 +82,27 @@ final class question_type_test extends \advanced_testcase {
         ]);
     }
 
+    /**
+     * Populate the calculated datasetitems form fields required by save_question_calculated().
+     *
+     * @param \stdClass $questiondata Full question data loaded from question_bank::load_question_data().
+     * @param \stdClass $form Form object to populate.
+     */
+    private function populate_required_datasetitems_form_fields(\stdClass $questiondata, \stdClass $form): void {
+        $form->tolerance = [];
+        $form->tolerancetype = [];
+        $form->correctanswerlength = [];
+        $form->correctanswerformat = [];
+
+        foreach ($questiondata->options->answers as $answerid => $answer) {
+            // Use values from the stored question options where available.
+            $form->tolerance[$answerid] = (string)($answer->tolerance ?? '0.001');
+            $form->tolerancetype[$answerid] = (string)($answer->tolerancetype ?? '1');
+            $form->correctanswerlength[$answerid] = (string)($answer->correctanswerlength ?? '2');
+            $form->correctanswerformat[$answerid] = (string)($answer->correctanswerformat ?? '1');
+        }
+    }
+
     public function test_name(): void {
         $this->assertEquals($this->qtype->name(), 'calculated');
     }
@@ -384,12 +405,9 @@ final class question_type_test extends \advanced_testcase {
             'definition' => [],
             'number' => [],
             'itemid' => [],
-            'tolerance' => [],
-            'tolerancetype' => [],
-            'correctanswerlength' => [],
-            'correctanswerformat' => [],
         ];
-
+        $questiondata = question_bank::load_question_data($question->id);
+        $this->populate_required_datasetitems_form_fields($questiondata, $form);
         $this->expectException(\moodle_exception::class);
         $this->qtype->save_question($question, $form);
     }
@@ -430,12 +448,9 @@ final class question_type_test extends \advanced_testcase {
             'definition' => [],
             'number' => [],
             'itemid' => [],
-            'tolerance' => [],
-            'tolerancetype' => [],
-            'correctanswerlength' => [],
-            'correctanswerformat' => [],
         ];
-
+        $questiondata = question_bank::load_question_data($question->id);
+        $this->populate_required_datasetitems_form_fields($questiondata, $form);
         $this->qtype->save_question($question, $form);
 
         $version = $DB->get_record('question_versions', ['questionid' => $question->id], 'status', MUST_EXIST);
@@ -477,12 +492,9 @@ final class question_type_test extends \advanced_testcase {
             'definition' => [],
             'number' => [],
             'itemid' => [],
-            'tolerance' => [],
-            'tolerancetype' => [],
-            'correctanswerlength' => [],
-            'correctanswerformat' => [],
         ];
-
+        $questiondata = question_bank::load_question_data($question->id);
+        $this->populate_required_datasetitems_form_fields($questiondata, $form);
         $this->qtype->save_question($question, $form);
 
         $version = $DB->get_record('question_versions', ['questionid' => $question->id], 'status', MUST_EXIST);
