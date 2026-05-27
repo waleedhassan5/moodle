@@ -57,7 +57,6 @@ final class question_type_test extends \advanced_testcase {
      */
     private function add_one_dataset_item(int $questionid): void {
         global $DB;
-
         // Dataset definition.
         $datasetdef = (object)[
             'type' => 1,
@@ -67,14 +66,11 @@ final class question_type_test extends \advanced_testcase {
             'itemcount' => 1,
         ];
         $datasetdef->id = $DB->insert_record('question_dataset_definitions', $datasetdef);
-
         // Link to question.
         $DB->insert_record('question_datasets', (object)[
             'question' => $questionid,
             'datasetdefinition' => $datasetdef->id,
         ]);
-
-        // One item.
         $DB->insert_record('question_dataset_items', (object)[
             'definition' => $datasetdef->id,
             'itemnumber' => 1,
@@ -83,9 +79,13 @@ final class question_type_test extends \advanced_testcase {
     }
 
     /**
-     * Populate the calculated datasetitems form fields required by save_question_calculated().
+     * Populate the datasetitems form fields required by qtype_calculated::save_question_calculated().
      *
-     * @param \stdClass $questiondata Full question data loaded from question_bank::load_question_data().
+     * The arrays must be keyed by the real answer ids. In tests, get those ids by loading the
+     * saved question via question_bank::load_question_data($questionid) and using
+     * $questiondata->options->answers as the source.
+     *
+     * @param \stdClass $questiondata Full question data from question_bank::load_question_data().
      * @param \stdClass $form Form object to populate.
      */
     private function populate_required_datasetitems_form_fields(\stdClass $questiondata, \stdClass $form): void {
@@ -93,7 +93,6 @@ final class question_type_test extends \advanced_testcase {
         $form->tolerancetype = [];
         $form->correctanswerlength = [];
         $form->correctanswerformat = [];
-
         foreach ($questiondata->options->answers as $answerid => $answer) {
             // Use values from the stored question options where available.
             $form->tolerance[$answerid] = (string)($answer->tolerance ?? '0.001');
@@ -315,10 +314,8 @@ final class question_type_test extends \advanced_testcase {
      */
     public function test_missing_datasets_throws_friendly_exception_when_not_editing(): void {
         global $PAGE;
-
         $this->resetAfterTest();
         $this->setAdminUser();
-
         $syscontext = \context_system::instance();
         /** @var \core_question_generator $generator */
         $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
@@ -326,16 +323,13 @@ final class question_type_test extends \advanced_testcase {
 
         $fromform = \test_question_maker::get_question_form_data('calculated');
         $fromform->category = $category->id . ',' . $syscontext->id;
-
         $question = (object)[
             'category' => $category->id,
             'qtype' => 'calculated',
             'createdby' => 0,
         ];
         $this->qtype->save_question($question, $fromform);
-
         $PAGE->set_pagetype('mod-quiz-startattempt');
-
         try {
             question_bank::load_question($question->id);
             $this->fail('Expected moodle_exception was not thrown.');
@@ -351,7 +345,6 @@ final class question_type_test extends \advanced_testcase {
     public function test_missing_datasets_does_not_throw_when_editing_request(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
-
         $syscontext = \context_system::instance();
         /** @var \core_question_generator $generator */
         $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
@@ -359,17 +352,14 @@ final class question_type_test extends \advanced_testcase {
 
         $fromform = \test_question_maker::get_question_form_data('calculated');
         $fromform->category = $category->id . ',' . $syscontext->id;
-
         $question = (object)[
             'category' => $category->id,
             'qtype' => 'calculated',
             'createdby' => 0,
         ];
         $this->qtype->save_question($question, $fromform);
-
         $cache = \cache::make('qtype_calculated', 'editingrequest');
         $cache->set('editing', true);
-
         $qdef = question_bank::load_question($question->id);
         $this->assertInstanceOf(\question_definition::class, $qdef);
         $cache->delete('editing');
@@ -381,21 +371,17 @@ final class question_type_test extends \advanced_testcase {
     public function test_save_question_datasetitems_ready_throws_when_setup_missing(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
-
         $syscontext = \context_system::instance();
         $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
         $category = $generator->create_question_category(['contextid' => $syscontext->id]);
-
         $fromform = \test_question_maker::get_question_form_data('calculated');
         $fromform->category = $category->id . ',' . $syscontext->id;
-
         $question = (object)[
             'category' => $category->id,
             'qtype' => 'calculated',
             'createdby' => 0,
         ];
         $this->qtype->save_question($question, $fromform);
-
         // Force wizardnow=datasetitems path (save_question reads it via optional_param).
         $_POST['wizardnow'] = 'datasetitems';
 
@@ -421,28 +407,22 @@ final class question_type_test extends \advanced_testcase {
 
         $this->resetAfterTest();
         $this->setAdminUser();
-
         $syscontext = \context_system::instance();
         /** @var \core_question_generator $generator */
         $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
         $category = $generator->create_question_category(['contextid' => $syscontext->id]);
-
         $fromform = \test_question_maker::get_question_form_data('calculated');
         $fromform->category = $category->id . ',' . $syscontext->id;
-
         $question = (object)[
             'category' => $category->id,
             'qtype' => 'calculated',
             'createdby' => 0,
         ];
         $this->qtype->save_question($question, $fromform);
-
         // Make the question "set up" by inserting one dataset item.
         $this->add_one_dataset_item((int)$question->id);
-
         // Force wizardnow=datasetitems path (save_question reads it via optional_param).
         $_POST['wizardnow'] = 'datasetitems';
-
         $form = (object)[
             'id' => $question->id,
             'status' => \core_question\local\bank\question_version_status::QUESTION_STATUS_READY,
@@ -453,9 +433,7 @@ final class question_type_test extends \advanced_testcase {
         $questiondata = question_bank::load_question_data($question->id);
         $this->qtype->get_question_options($questiondata);
         $this->populate_required_datasetitems_form_fields($questiondata, $form);
-
         $this->qtype->save_question($questiondata, $form);
-
         $version = $DB->get_record('question_versions', ['questionid' => $question->id], 'status', MUST_EXIST);
         $this->assertEquals(\core_question\local\bank\question_version_status::QUESTION_STATUS_READY, $version->status);
     }
@@ -465,30 +443,23 @@ final class question_type_test extends \advanced_testcase {
      */
     public function test_save_question_datasetitems_saves_draft_when_selected(): void {
         global $DB;
-
         $this->resetAfterTest();
         $this->setAdminUser();
-
         $syscontext = \context_system::instance();
         /** @var \core_question_generator $generator */
         $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
         $category = $generator->create_question_category(['contextid' => $syscontext->id]);
-
         $fromform = \test_question_maker::get_question_form_data('calculated');
         $fromform->category = $category->id . ',' . $syscontext->id;
-
         $question = (object)[
             'category' => $category->id,
             'qtype' => 'calculated',
             'createdby' => 0,
         ];
         $this->qtype->save_question($question, $fromform);
-
         $this->add_one_dataset_item((int)$question->id);
-
         // Force wizardnow=datasetitems path (save_question reads it via optional_param).
         $_POST['wizardnow'] = 'datasetitems';
-
         $form = (object)[
             'id' => $question->id,
             'status' => \core_question\local\bank\question_version_status::QUESTION_STATUS_DRAFT,
@@ -499,11 +470,8 @@ final class question_type_test extends \advanced_testcase {
         $questiondata = question_bank::load_question_data($question->id);
         $this->qtype->get_question_options($questiondata);
         $this->populate_required_datasetitems_form_fields($questiondata, $form);
-
         $this->qtype->save_question($questiondata, $form);
-
         $version = $DB->get_record('question_versions', ['questionid' => $question->id], 'status', MUST_EXIST);
         $this->assertEquals(\core_question\local\bank\question_version_status::QUESTION_STATUS_DRAFT, $version->status);
     }
-
 }
