@@ -402,9 +402,7 @@ class qtype_calculated extends question_type {
     public function restrict_status_if_setup_required(\MoodleQuickForm $mform, \stdClass $question): void {
         $qtype = question_bank::get_qtype($question->qtype);
 
-        $setuprequired = empty($question->id) || $qtype->question_requires_setup((int) $question->id);
-
-        if (!$setuprequired) {
+        if ($question->id && !$qtype->question_requires_setup((int) $question->id)) {
             return;
         }
 
