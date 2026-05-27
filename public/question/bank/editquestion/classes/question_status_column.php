@@ -53,14 +53,8 @@ class question_status_column extends column_base {
             && $question->status !== question_version_status::QUESTION_STATUS_HIDDEN) {
             $options = [];
             $options['questionid'] = $question->id;
-            $setuprequired = false;
-            try {
-                $qtype = question_bank::get_qtype($question->qtype);
-                $setuprequired = method_exists($qtype, 'question_requires_setup')
-                    && $qtype->question_requires_setup($question->id);
-            } catch (\core\exception\coding_exception $e) {
-                $setuprequired = false;
-            }
+            $qtype = question_bank::get_qtype($question->qtype, false);
+            $setuprequired = $qtype->question_requires_setup($question->id);
 
             $statuslist = editquestion_helper::get_question_status_list();
             foreach ($statuslist as $value => $displaystatus) {

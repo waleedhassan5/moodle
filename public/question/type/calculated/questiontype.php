@@ -285,8 +285,6 @@ class qtype_calculated extends question_type {
      *
      * @param int $questionid The question ID to edit.
      * @return \moodle_url URL to the question editing page.
-     * @throws \core\exception\moodle_exception
-     * @throws coding_exception
      */
     protected function get_fix_datasets_url(int $questionid): \moodle_url {
         // In the quiz context, the question editing screen requires cmid.
@@ -318,7 +316,6 @@ class qtype_calculated extends question_type {
      *
      * @param int $questionid The ID of the question to check.
      * @return bool True if the question is missing dataset items, false otherwise.
-     * @throws \dml_exception
      */
     public function question_requires_setup(int $questionid): bool {
         global $DB;
@@ -336,8 +333,6 @@ class qtype_calculated extends question_type {
      *
      * @param int $questionid The question ID whose version status should be updated.
      * @param string $status The target status (e.g. QUESTION_STATUS_DRAFT or READY).
-     * @return void
-     * @throws dml_exception
      */
     protected function set_question_version_status(int $questionid, string $status): void {
         global $DB;
@@ -364,8 +359,6 @@ class qtype_calculated extends question_type {
      * Otherwise throw the no-link exception.
      *
      * @param stdClass $questiondata Question DB record/structure with at least ->id and ->contextid.
-     * @return void
-     * @throws moodle_exception
      */
     protected function require_datasets_ready_for_use(\stdClass $questiondata): void {
         if ($this->is_question_editing_request() || !$this->question_requires_setup((int)$questiondata->id)) {
@@ -779,7 +772,6 @@ class qtype_calculated extends question_type {
      * @param object $form
      * @param int $course
      * @param PARAM_ALPHA $wizardnow should be added as we are coming from question2.php
-     * @throws dml_exception
      */
     public function save_question($question, $form) {
         global $DB;
