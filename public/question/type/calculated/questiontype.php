@@ -403,8 +403,7 @@ class qtype_calculated extends question_type {
         $qtype = question_bank::get_qtype($question->qtype);
 
         $setuprequired = empty($question->id) ||
-            (method_exists($qtype, 'question_requires_setup') &&
-                $qtype->question_requires_setup((int) $question->id) !== null);
+            ($qtype->question_requires_setup((int) $question->id) !== null);
 
         if (!$setuprequired) {
             return;
